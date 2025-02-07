@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<script src="https://code.jquery.com/jquery-3.3.1.js"></script>
+<script> 
+$(function(){
+  $("#common").load("common.html"); 
+});
+</script> 
+
+<div id="common"></div>
+<body>
+    <div class="library-container">
+        <div class="library-header">
+            <h1>Digital Library</h1>
+            <div class="filter-controls">
+                <select id="categoryFilter">
+                    <option value="">All Categories</option>
+                    <option value="books">Books</option>
+                    <option value="articles">Articles</option>
+                    <option value="research">Research Papers</option>
+                    <option value="thesis">Thesis</option>
+                    <option value="other">Other</option>
+                </select>
+                <input type="text" id="searchInput" placeholder="Search resources...">
+            </div>
+        </div>
+
+        <div class="resources-grid" id="resourcesContainer">
+            <!-- Resources will be dynamically added here -->
+        </div>
+    </div>
+
+    <div class="footer">
+        <p>&copy; 2023 Digital Library. All rights reserved.</p>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getAllUploads } from './js/upload-manager.js';
+
+        // Wait for Firebase to be initialized from common.html
+        const waitForFirebase = () => {
+            return new Promise((resolve) => {
+                const check = () => {
+                    if (window.db) {
+                        resolve();
+                    } else {
+                        setTimeout(check, 100);
+                    }
+                };
+                check();
+            });
+        };
+
+        async function loadResources() {
+            try {
+                // Wait for Firebase to be initialized
+                await waitForFirebase();
+                
+                const resources = await getAllUploads();
+                const container = document.getElementById('resourcesContainer');
+                container.innerHTML = '';
+
+                if (resources.length === 0) {
+                    container.innerHTML = '<p class="no-resources">No resources found</p>';
+                    return;
+                }
+
+                resources.forEach(resource => {
+                    const card = createResourceCard(resource);
+                    container.appendChild(card);
+                });
+            } catch (error) {
+                console.error('Error loading resources:', error);
+                const container = document.getElementById('resourcesContainer');
+                container.innerHTML = '<p class="error-message">Error loading resources. Please try again later.</p>';
+            }
+        }
+
+        function createResourceCard(resource) {
+            const card = document.createElement('div');
+            card.className = 'resource-card';
+            
+            // Format file size
+            const fileSize = resource.fileSize ? formatFileSize(resource.fileSize) : 'Unknown size';
+            const fileName = resource.name.split('/').pop(); // Remove path from filename
+            
+            card.innerHTML = `
+                <div class="resource-icon">
+                    <i class="fas fa-file-${getFileIcon(resource.fileType)}"></i>
+                </div>
+                <div class="resource-info">
+                    <h3>${resource.title}</h3>
+                    <p class="category">${resource.category}</p>
+                    ${resource.userEmail ? `<p class="upload-info">Uploaded by ${resource.userEmail}</p>` : ''}
+                    <p class="date">Uploaded on ${new Date(resource.uploadDate).toLocaleDateString()}</p>
+                    <p class="file-details">
+                        <span class="file-name">${fileName}</span>
+                        <span class="file-size">${fileSize}</span>
+                        <span class="file-type">${resource.fileType || 'Unknown type'}</span>
+                    </p>
+                    ${resource.description ? `<p class="description">${resource.description}</p>` : ''}
+                </div>
+                <div class="card-actions">
+                    <a href="${resource.url}" class="view-button" target="_blank">
+                        <i class="fas fa-eye"></i> View
+                    </a>
+                    <a href="${resource.url}" class="download-button" download="${fileName}">
+                        <i class="fas fa-download"></i> Download
+                    </a>
+                </div>
+            `;
+            return card;
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        function getFileIcon(fileType) {
+            if (fileType.includes('pdf')) return 'pdf';
+            if (fileType.includes('image')) return 'image';
+            if (fileType.includes('word')) return 'word';
+            return 'alt';
+        }
+
+        // Load resources when page loads
+        document.addEventListener('DOMContentLoaded', loadResources);
+
+        // Add filter functionality
+        document.getElementById('categoryFilter').addEventListener('change', filterResources);
+        document.getElementById('searchInput').addEventListener('input', filterResources);
+
+        async function filterResources() {
+            try {
+                await waitForFirebase();
+                
+                const category = document.getElementById('categoryFilter').value;
+                const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+                const resources = await getAllUploads();
+
+                const filtered = resources.filter(resource => {
+                    const matchesCategory = !category || resource.category === category;
+                    const matchesSearch = !searchTerm || 
+                        resource.title.toLowerCase().includes(searchTerm) ||
+                        (resource.description && resource.description.toLowerCase().includes(searchTerm));
+                    return matchesCategory && matchesSearch;
+                });
+
+                const container = document.getElementById('resourcesContainer');
+                container.innerHTML = '';
+                
+                if (filtered.length === 0) {
+                    container.innerHTML = '<p class="no-resources">No matching resources found</p>';
+                    return;
+                }
+
+                filtered.forEach(resource => {
+                    const card = createResourceCard(resource);
+                    container.appendChild(card);
+                });
+            } catch (error) {
+                console.error('Error filtering resources:', error);
+                alert('Error filtering resources');
+            }
+        }
+    </script>
+</body>
+</html> 

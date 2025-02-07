@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<script src="https://code.jquery.com/jquery-3.3.1.js"></script>
+<script> 
+$(function(){
+  $("#common").load("common.html"); 
+});
+</script> 
+
+<div id="common"></div>
+<body>
+    <div class="upload-container">
+        <div class="upload-form">
+            <div class="upload-header">
+                <i class="fas fa-cloud-upload-alt"></i>
+                <h2>Upload Your Digital File</h2>
+                <p>Share your knowledge with our community</p>
+            </div>
+
+            <form id="uploadForm" onsubmit="handleUpload(event)" enctype="multipart/form-data">
+                <div class="input-group">
+                    <i class="fas fa-book"></i>
+                    <input type="text" id="title" placeholder="Title of the Resource" required>
+                </div>
+
+                <div class="select-group">
+                    <i class="fas fa-tags"></i>
+                    <select id="category" required>
+                        <option value="" disabled selected>Select Category</option>
+                        <option value="books">Books</option>
+                        <option value="articles">Articles</option>
+                        <option value="research">Research Papers</option>
+                        <option value="thesis">Thesis</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
+
+                <div class="file-upload-area" id="dropZone">
+                    <input type="file" id="file-upload" accept=".pdf,.doc,.docx,.txt,.rtf" required>
+                    <label for="file-upload">
+                        <i class="fas fa-file-upload"></i>
+                        <span id="file-label">Choose a file or drag it here</span>
+                    </label>
+                    <p class="file-info">Accepted formats: PDF, DOC, DOCX, TXT, RTF (Max: 50MB)</p>
+                </div>
+
+                <div class="input-group">
+                    <textarea id="description" placeholder="Description (Optional)" rows="4"></textarea>
+                </div>
+
+                <div class="terms-checkbox">
+                    <label>
+                        <input type="checkbox" required>
+                        I confirm this content doesn't violate any copyright laws
+                    </label>
+                </div>
+
+                <button type="submit" id="uploadButton">Upload Resource</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="footer">
+        <p>&copy; 2023 Digital Library. All rights reserved.</p>
+    </div>
+
+    <script type="module">
+        import { uploadFile } from './js/upload-manager.js';
+
+        // Add drag and drop functionality
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('file-upload');
+        const fileLabel = document.getElementById('file-label');
+        const uploadButton = document.getElementById('uploadButton');
+
+        // Prevent default drag behaviors
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, preventDefaults, false);
+            document.body.addEventListener(eventName, preventDefaults, false);
+        });
+
+        // Highlight drop zone when item is dragged over it
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, highlight, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, unhighlight, false);
+        });
+
+        // Handle dropped files
+        dropZone.addEventListener('drop', handleDrop, false);
+
+        function preventDefaults (e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        function highlight(e) {
+            dropZone.classList.add('highlight');
+        }
+
+        function unhighlight(e) {
+            dropZone.classList.remove('highlight');
+        }
+
+        function handleDrop(e) {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            fileInput.files = files;
+            updateFileLabel(files[0]);
+        }
+
+        // Update file label when file is selected
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                updateFileLabel(e.target.files[0]);
+            }
+        });
+
+        function updateFileLabel(file) {
+            if (file) {
+                const maxSize = 50 * 1024 * 1024; // 50MB in bytes
+                if (file.size > maxSize) {
+                    alert('File is too large. Maximum size is 50MB.');
+                    fileInput.value = '';
+                    fileLabel.textContent = 'Choose a file or drag it here';
+                    return;
+                }
+                fileLabel.textContent = file.name;
+            } else {
+                fileLabel.textContent = 'Choose a file or drag it here';
+            }
+        }
+
+        window.handleUpload = async function(event) {
+            event.preventDefault();
+            
+            const user = JSON.parse(localStorage.getItem('user'));
+            if (!user) {
+                alert('Please login to upload files');
+                window.location.href = 'login.html';
+                return;
+            }
+            
+            const fileInput = document.getElementById('file-upload');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                alert('Please select a file');
+                return;
+            }
+
+            // Disable upload button and show loading state
+            uploadButton.disabled = true;
+            uploadButton.textContent = 'Uploading...';
+
+            try {
+                const metadata = {
+                    title: document.getElementById('title').value,
+                    category: document.getElementById('category').value,
+                    description: document.getElementById('description').value
+                };
+
+                await uploadFile(file, metadata);
+                alert('File uploaded successfully!');
+                window.location.href = 'library.html';
+            } catch (error) {
+                console.error('Upload error:', error);
+                alert('Upload failed: ' + error.message);
+                // Re-enable upload button
+                uploadButton.disabled = false;
+                uploadButton.textContent = 'Upload Resource';
+            }
+        }
+    </script>
+</body>
+</html> 
